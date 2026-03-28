@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["views"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String?
+  email      String?  @unique
+  createdAt  DateTime @default(now()) @map("created_at")
+  trades     Trade[]
+  logs       PortfolioLog[]
+
+  @@map("users")
+}
+
+model Trade {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  symbol      String?
+  tradeType   String?  @map("trade_type")
+  quantity    Decimal? @db.Decimal
+  price       Decimal? @db.Decimal
+  totalValue  Decimal? @default(dbgenerated("(quantity * price)")) @map("total_value") @db.Decimal
+  status      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@map("trades")
+}
+
+model PortfolioLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  balance   Decimal? @db.Decimal
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@map("portfolio_logs")
+}
+
+model TradingAnalytics {
+  date        DateTime @id
+  totalTrades Int      @map("total_trades")
+  totalVolume Decimal  @map("total_volume") @db.Decimal
+  buyCount    Int      @map("buy_count")
+  sellCount   Int      @map("sell_count")
+  buyVolume   Decimal  @map("buy_volume") @db.Decimal
+  sellVolume  Decimal  @map("sell_volume") @db.Decimal
+
+  @@map("trading_analytics")
+}

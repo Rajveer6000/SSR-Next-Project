@@ -1,29 +1,43 @@
-import "dotenv/config";
-import cors from "cors";
+import dotenv from "dotenv";
 import express from "express";
+import cors from "cors";
+import tradingRouter from "./routes/trading.js";
+import healthRouter from "./routes/health.js";
+import { ensureIndexes } from "./utils/db.js";
+import swaggerUi from "swagger-ui-express";
+import swaggerJsdoc from "swagger-jsdoc";
+
+dotenv.config({ path: ".env.dev" });
 
 const app = express();
+const port = process.env.PORT || 4000;
+
+const swaggerSpec = swaggerJsdoc({
+  definition: {
+    openapi: "3.1.0",
+    info: {
+      title: "Trading API",
+      version: "1.0.0",
+      description: "API for trading and portfolio analytics.",
+    },
+    servers: [{ url: `http://localhost:${port}` }],
+  },
+  // Scan route files for @swagger JSDoc blocks
+  apis: ["./src/routes/*.ts"],
+});
 
 app.use(cors());
 app.use(express.json());
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get("/api-docs.json", (_req, res) => res.json(swaggerSpec));
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime(), timestamp: new Date().toISOString() });
-});
+// Main routes
+app.use("/health", healthRouter);
+app.use("/", tradingRouter);
 
-app.get("/api/cards", (_req, res) => {
-  type Card = { id: number; title: string; body: string };
-
-  const cards: Card[] = [
-    { id: 1, title: "Sample card", body: "Replace this demo data with your own." },
-    { id: 2, title: "Stack ready", body: "Backend is split from frontend; extend routes as needed." },
-  ];
-
-  res.json(cards);
-});
-
-const port = Number(process.env.PORT) || 4000;
-
-app.listen(port, () => {
-  console.log(`[backend] API server running on http://localhost:${port}`);
+// Initialize database indexes and start server
+ensureIndexes().then(() => {
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
 });

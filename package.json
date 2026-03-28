@@ -17,5 +17,10 @@
     "start": "pnpm --filter frontend start",
     "start:backend": "pnpm --filter backend start",
     "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "next": "16.2.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   }
 }
