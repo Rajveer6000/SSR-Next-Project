@@ -1,14 +1,6 @@
-# Next.js
-/next-ts-app/.next/
-
-# Dependencies
-/next-ts-app/node_modules
-
-# Debug
-pnpm-debug.log*
-
 # Dependencies
 /node_modules
+/next-ts-app/node_modules
 /.pnp
 .pnp.js
 
@@ -17,6 +9,7 @@ pnpm-debug.log*
 
 # Next.js
 /.next/
+/next-ts-app/.next/
 /out/
 
 # Production
@@ -24,6 +17,7 @@ pnpm-debug.log*
 
 # Misc
 .DS_Store
+Thumbs.db
 *.pem
 .env
 .env.local
@@ -33,6 +27,7 @@ pnpm-debug.log*
 
 # Debug
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
@@ -42,6 +37,3 @@ yarn-error.log*
 *.swp
 *.swo
 *~
-
-# OS
-Thumbs.db
