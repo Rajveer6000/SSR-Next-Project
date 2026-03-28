@@ -1,3 +1,11 @@
+# Next.js
+/next-ts-app/.next/
+
+# Dependencies
+/next-ts-app/node_modules
+
+# Debug
+pnpm-debug.log*
 
 # Dependencies
 /node_modules
