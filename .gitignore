@@ -1,41 +1,41 @@
 # Dependencies
-/node_modules
-/next-ts-app/node_modules
-/.pnp
+node_modules
+.pnp
 .pnp.js
 
-# Testing
-/coverage
+# Build outputs
+.next
+out
+build
+dist
+frontend/.next
+frontend/out
+backend/dist
 
-# Next.js
-/.next/
-/next-ts-app/.next/
-/out/
+# Coverage
+coverage
 
-# Production
-/build
-
-# Misc
-.DS_Store
-Thumbs.db
-*.pem
+# Environment
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Debug
+# Debug logs
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Misc / OS
+.DS_Store
+Thumbs.db
+*.pem
+
 # IDE
-.vscode/
-.idea/
+.vscode
+.idea
 *.swp
 *.swo
 *~
-
-next-ts-app
