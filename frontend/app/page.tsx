@@ -19,19 +19,19 @@ type UserStats = {
 
 type Health = { status: string; database: string; timestamp: string };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4000";
 const PAGE_SIZE = 20; // backend returns 20 at a time
 
 export default function Home() {
   const [users, setUsers] = useState<UserStats[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const inFlight = useRef(false);
+  const lastCursorRef = useRef<string | null>(null);
 
   // Fetch initial health
   useEffect(() => {
@@ -41,59 +41,69 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  const fetchUsers = useCallback(
-    async (nextCursor?: string | null) => {
-      if (loading || !hasMore) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const url = new URL(`${API_BASE}/api/users`);
-        if (nextCursor) url.searchParams.set("cursor", nextCursor);
-        const res = await fetch(url.toString());
-        if (!res.ok) throw new Error(`API ${res.status}`);
-        const data: UserStats[] = await res.json();
+  const fetchUsers = useCallback(async () => {
+    if (inFlight.current || !hasMore) return;
 
+    inFlight.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const url = new URL(`${API_BASE}/api/users`);
+      if (lastCursorRef.current) {
+        url.searchParams.set("cursor", lastCursorRef.current);
+      }
+
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`API ${res.status}`);
+
+      const data: UserStats[] = await res.json();
+
+      if (data.length === 0) {
+        setHasMore(false);
+      } else {
         setUsers((prev) => {
           const seen = new Set(prev.map((u) => u.id));
           const filtered = data.filter((u) => !seen.has(u.id));
           return [...prev, ...filtered];
         });
 
-        const newCursor = data.length > 0 ? data[data.length - 1].id : null;
-        setCursor(newCursor);
-        setHasMore(data.length === PAGE_SIZE && !!newCursor);
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load users";
-        setError(message);
-      } finally {
-        setLoading(false);
+        lastCursorRef.current = data[data.length - 1].id;
+
+        if (data.length < PAGE_SIZE) {
+          setHasMore(false);
+        }
       }
-    },
-    [hasMore, loading]
-  );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load users");
+    } finally {
+      setLoading(false);
+      inFlight.current = false;
+    }
+  }, [hasMore]);
 
   // Initial load
   useEffect(() => {
-    fetchUsers(null);
+    fetchUsers();
   }, [fetchUsers]);
 
-  // Infinite scroll observer
+  // Intersection Observer for infinite scroll
   useEffect(() => {
-    const target = sentinelRef.current;
-    if (!target) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        const entry = entries[0];
-        if (entry.isIntersecting && hasMore && !loading) {
-          fetchUsers(cursor);
+        if (entries[0].isIntersecting && hasMore && !inFlight.current) {
+          fetchUsers();
         }
       },
-      { rootMargin: "200px" }
+      { threshold: 0.1, rootMargin: "200px" },
     );
-    observer.observe(target);
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
     return () => observer.disconnect();
-  }, [cursor, fetchUsers, hasMore, loading]);
+  }, [fetchUsers, hasMore]);
 
   const statusChip = useMemo(() => {
     if (!health) return null;
@@ -148,9 +158,7 @@ export default function Home() {
                   <h2 className="text-xl font-semibold text-white">
                     {user.name ?? "Anonymous"}
                   </h2>
-                  <p className="text-sm text-slate-400">
-                    {user.email}
-                  </p>
+                  <p className="text-sm text-slate-400">{user.email}</p>
                 </div>
                 <div className="rounded-xl bg-amber-500/15 px-3 py-2 text-right text-xs font-semibold leading-tight text-amber-200">
                   <p>Risk</p>
@@ -161,8 +169,16 @@ export default function Home() {
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <Stat label="Total Volume" value={user.stats.totalVolume} fmt="currency" />
-                <Stat label="Latest Balance" value={user.stats.latestBalance} fmt="currency" />
+                <Stat
+                  label="Total Volume"
+                  value={user.stats.totalVolume}
+                  fmt="currency"
+                />
+                <Stat
+                  label="Latest Balance"
+                  value={user.stats.latestBalance}
+                  fmt="currency"
+                />
                 <Stat label="Buys" value={user.stats.buyCount} />
                 <Stat label="Sells" value={user.stats.sellCount} />
                 <Stat label="Open Trades" value={user.stats.openTrades} />
