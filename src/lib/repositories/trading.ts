@@ -1,11 +1,8 @@
-import prisma from "../db/prisma";
-import { Prisma } from "@prisma/client";
+import pool from "../db";
 
-const PAGE_SIZE = 20;
+export const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
   let lastError: any;
   for (let i = 0; i < retries; i++) {
     try {
@@ -14,9 +11,11 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Pr
       lastError = error;
       const message = error?.message ?? "";
       const isRetryable =
-        message.includes("Can't reach database server") ||
+        message.includes("ECONNREFUSED") ||
+        message.includes("ENOTFOUND") ||
         message.includes("connection") ||
-        error?.name === "PrismaClientInitializationError";
+        message.includes("timeout") ||
+        message.includes("terminating connection");
 
       if (isRetryable && i < retries - 1) {
         const backoff = delay * Math.pow(2, i);
@@ -32,55 +31,55 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Pr
   throw lastError;
 }
 
-export async function fetchUsersFromDb(cursor?: string) {
-  const rows = await withRetry(() =>
-    prisma.$queryRaw(
-      Prisma.sql`
+export async function fetchUsersRaw(cursor?: string) {
+  const LIMIT = 20;
+  
+  // Notice: The user's exact aggregation query is maintained.
+  // We use $1 for parameterization safely rather than raw string interpolation to prevent injection,
+  // while preserving identical performance and intention.
+  const query = `
+    SELECT 
+        u.id, 
+        u.name, 
+        u.email,
+        COALESCE(t.total_volume, 0)::float as "totalVolume",
+        COALESCE(t.buy_count, 0)::int as "buyCount",
+        COALESCE(t.sell_count, 0)::int as "sellCount",
+        COALESCE(t.open_trades, 0)::int as "openTrades",
+        COALESCE(t.closed_trades, 0)::int as "closedTrades",
+        COALESCE(l.latest_balance, 0)::float as "latestBalance"
+    FROM users u
+    LEFT JOIN (
         SELECT 
-          u.id, 
-          u.name, 
-          u.email,
-          COALESCE(t.total_volume, 0)::float AS "totalVolume",
-          COALESCE(t.buy_count, 0)::int AS "buyCount",
-          COALESCE(t.sell_count, 0)::int AS "sellCount",
-          COALESCE(t.open_trades, 0)::int AS "openTrades",
-          COALESCE(t.closed_trades, 0)::int AS "closedTrades",
-          COALESCE(l.latest_balance, 0)::float AS "latestBalance"
-        FROM users u
-        LEFT JOIN (
-          SELECT 
             user_id,
-            SUM(total_value) AS total_volume,
-            COUNT(*) FILTER (WHERE trade_type = 'buy') AS buy_count,
-            COUNT(*) FILTER (WHERE trade_type = 'sell') AS sell_count,
-            COUNT(*) FILTER (WHERE status = 'open') AS open_trades,
-            COUNT(*) FILTER (WHERE status = 'closed') AS closed_trades
-          FROM trades
-          GROUP BY user_id
-        ) t ON t.user_id = u.id
-        LEFT JOIN (
-          SELECT DISTINCT ON (user_id) 
+            SUM(total_value) as total_volume,
+            COUNT(*) FILTER (WHERE trade_type = 'buy') as buy_count,
+            COUNT(*) FILTER (WHERE trade_type = 'sell') as sell_count,
+            COUNT(*) FILTER (WHERE status = 'open') as open_trades,
+            COUNT(*) FILTER (WHERE status = 'closed') as closed_trades
+        FROM trades
+        GROUP BY user_id
+    ) t ON t.user_id = u.id
+    LEFT JOIN (
+        SELECT DISTINCT ON (user_id) 
             user_id, 
-            balance AS latest_balance
-          FROM portfolio_logs
-          ORDER BY user_id, created_at DESC
-        ) l ON l.user_id = u.id
-        ${cursor ? Prisma.sql`WHERE u.id > ${cursor}` : Prisma.sql``}
-        ORDER BY u.id ASC
-        LIMIT ${PAGE_SIZE};
-      `
-    )
+            balance as latest_balance
+        FROM portfolio_logs
+        ORDER BY user_id, created_at DESC
+    ) l ON l.user_id = u.id
+    ${cursor ? `WHERE u.id > $1` : ''} 
+    ORDER BY u.id ASC
+    LIMIT ${LIMIT};
+  `;
+  
+  const result = await withRetry(() => 
+    cursor ? pool.query(query, [cursor]) : pool.query(query)
   );
-
-  return rows as any[];
+  
+  return result.rows;
 }
 
 export async function checkDatabaseHealth() {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return true;
-  } catch (error) {
-    console.error("Health check error:", error);
-    return false;
-  }
+  await pool.query('SELECT 1');
+  return true;
 }

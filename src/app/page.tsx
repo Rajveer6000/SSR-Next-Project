@@ -1,5 +1,7 @@
 import { getUsers } from "@/lib/services/trading";
 import { getHealthAction } from "./actions/trading";
+
+export const dynamic = "force-dynamic";
 import UserList from "./UserList";
 
 export default async function Home() {
