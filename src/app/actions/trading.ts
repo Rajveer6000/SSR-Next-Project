@@ -1,7 +1,11 @@
 "use server";
 
-import { prisma } from "../lib/prisma";
-import { getUsers, UserStats } from "../lib/trading";
+import {
+  getHealth,
+  getUsers,
+  type HealthStatus,
+  type UserStats,
+} from "@/lib/services/trading";
 
 export async function fetchUsersAction(cursor?: string): Promise<UserStats[]> {
   try {
@@ -14,14 +18,7 @@ export async function fetchUsersAction(cursor?: string): Promise<UserStats[]> {
 
 export async function getHealthAction() {
   try {
-    // Check database connection using prisma
-    await prisma.$queryRaw`SELECT 1`;
-
-    return {
-      status: "UP",
-      database: "CONNECTED",
-      timestamp: new Date().toISOString(),
-    };
+    return await getHealth();
   } catch (error) {
     console.error("Health check error:", error);
     return {
@@ -29,6 +26,6 @@ export async function getHealthAction() {
       database: "DISCONNECTED",
       error: error instanceof Error ? error.message : "Unknown error",
       timestamp: new Date().toISOString(),
-    };
+    } satisfies HealthStatus;
   }
 }

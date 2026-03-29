@@ -1,5 +1,5 @@
+import { getUsers } from "@/lib/services/trading";
 import { getHealthAction } from "./actions/trading";
-import { getUsers, UserStats } from "./lib/trading";
 import UserList from "./UserList";
 
 export default async function Home() {
