@@ -24,7 +24,7 @@ export type HealthStatus = {
 
 const heavyCalculation = (seed = 0) => {
   let result = seed;
-  for (let j = 0; j < 500000; j++) {
+  for (let j = 0; j < 10; j++) {
     result = Math.sqrt(result * 1.0001 + j);
   }
   return Number(result.toFixed(2));
