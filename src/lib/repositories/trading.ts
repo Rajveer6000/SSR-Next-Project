@@ -33,11 +33,8 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 20
 
 export async function fetchUsersRaw(cursor?: string) {
   const LIMIT = 20;
-  
-  // Notice: The user's exact aggregation query is maintained.
-  // We use $1 for parameterization safely rather than raw string interpolation to prevent injection,
-  // while preserving identical performance and intention.
-  const query = `
+
+  const queryText = `
     SELECT 
         u.id, 
         u.name, 
@@ -71,11 +68,14 @@ export async function fetchUsersRaw(cursor?: string) {
     ORDER BY u.id ASC
     LIMIT ${LIMIT};
   `;
-  
+
+  // Explicit pg binding format
   const result = await withRetry(() => 
-    cursor ? pool.query(query, [cursor]) : pool.query(query)
+    cursor 
+      ? pool.query({ text: queryText, values: [cursor] }) 
+      : pool.query({ text: queryText })
   );
-  
+
   return result.rows;
 }
 

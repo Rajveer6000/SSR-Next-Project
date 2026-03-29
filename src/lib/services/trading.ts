@@ -52,19 +52,21 @@ export async function getUsers(cursor?: string): Promise<UserStats[]> {
 
     for (const row of rawData) {
       // 🔥 Extremely Heavy CPU work happens HERE (Node side)
-      const riskScore = heavyCalculation(row.totalVolume);
+      // PG returns numeric as strings! We must explicitly Number() it so Server Actions can serialize numbers.
+      const totalVolume = Number(row.totalVolume ?? 0);
+      const riskScore = heavyCalculation(totalVolume);
 
       finalResult.push({
-        id: row.id,
-        name: row.name,
-        email: row.email,
+        id: String(row.id),
+        name: row.name ? String(row.name) : null,
+        email: row.email ? String(row.email) : null,
         stats: {
-          totalVolume: row.totalVolume,
-          buyCount: row.buyCount,
-          sellCount: row.sellCount,
-          openTrades: row.openTrades,
-          closedTrades: row.closedTrades,
-          latestBalance: row.latestBalance,
+          totalVolume,
+          buyCount: Number(row.buyCount ?? 0),
+          sellCount: Number(row.sellCount ?? 0),
+          openTrades: Number(row.openTrades ?? 0),
+          closedTrades: Number(row.closedTrades ?? 0),
+          latestBalance: Number(row.latestBalance ?? 0),
           riskScore,
         },
       });
@@ -77,7 +79,7 @@ export async function getUsers(cursor?: string): Promise<UserStats[]> {
     console.log(` >> DB Server Time (Aggregates): ${dbEnd - dbStart}ms`);
     console.log(` >> Node Server Time (Heavy Calc/Map): ${nodeEnd - nodeStart}ms`);
     console.log(` >> Total Response Time: ${totalTime}ms`);
-    const nextCursor = rawData[rawData.length - 1]?.id;
+    const nextCursor = String(rawData[rawData.length - 1]?.id);
     console.log(` >> NextCursor: ${nextCursor}`);
 
     return finalResult;

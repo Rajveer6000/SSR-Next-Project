@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchUsersAction } from "./actions/trading";
-import { UserStats } from "@/lib/services/trading";
+import type { UserStats } from "@/lib/services/trading";
 
 type UserListProps = {
   initialUsers: UserStats[];
